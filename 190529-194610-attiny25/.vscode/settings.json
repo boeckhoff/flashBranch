@@ -1,0 +1,8 @@
+{
+    "terminal.integrated.env.linux": {
+        "PATH": "/home/whitespin/.platformio/penv/bin:/home/whitespin/.platformio/penv:/home/whitespin/.local/bin:/home/whitespin/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games",
+        "PLATFORMIO_CALLER": "vscode"
+    },
+    "C_Cpp.errorSquiggles": "Disabled",
+    "C_Cpp.dimInactiveRegions": false
+}
