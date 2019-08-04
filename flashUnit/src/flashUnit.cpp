@@ -47,181 +47,125 @@ enum ERROR_CODE
 SoftwareSerial mySerial(RX_PIN, TX_PIN);
 
 // UART
-const char TERMINATION_CHARACTER = '\n';
-const uint8_t MAX_CHARS = 10;
-char message[MAX_CHARS];
+const uint8_t MESSAGE_LENGTH = 6;
+char message[MESSAGE_LENGTH];
+
+char buffer;
+char checksum;
+uint8_t index = 0;
+
 char errorMessage[8];
 bool newData = false;
 char id;
 
-uint8_t readVccVoltage(void) {
-  ADMUX = 0b00001100;
-
-	ADCSRA = _BV(ADEN) | _BV(ADPS1) | _BV(ADPS0);
-	_delay_ms(1);
-	ADCSRA |= _BV(ADSC);
-	while( ADCSRA & _BV( ADSC) ) ;
-
-	uint8_t low  = ADCL;
-	uint8_t high = ADCH;
-	uint16_t adc = (high << 8) | low;
-	uint8_t vccx10 = (uint8_t) ( (11 * 1024) / adc); 
-
-	return vccx10;
+void blink() {
+  digitalWrite(LED_PIN, HIGH);
+  delay(50/CLOCK_DIVIDER);
+  digitalWrite(LED_PIN, LOW);
+  delay(50/CLOCK_DIVIDER);
 }
 
+void receiveByte() {
+  buffer = mySerial.read();
+
+  if(index == MESSAGE_LENGTH-1) {
+    if(buffer == checksum) {
+      newData = true;
+    }
+    else {
+      blink();
+      blink();
+    }
+    checksum = 0;
+    index = 0;
+    return;
+  }
+
+  checksum ^= buffer;
+  message[index] = buffer;
+  index++;
+}
+
+/*
 void receiveUART()
 {
-  static uint8_t index = 0;
+  uint8_t index = 0;
 
   char buffer;
+  char checksum = 0;
 
   while (mySerial.available() > 0 && newData == false)
   {
     buffer = mySerial.read();
     message[index] = buffer;
 
-    if (buffer != TERMINATION_CHARACTER)
-    {
+    if(index != MESSAGE_LENGTH-1) {
+      checksum ^= buffer;
       index++;
-      if (index >= MAX_CHARS)
-      {
-        error = MESSAGE_TOO_LONG;
-      }
+      continue;
     }
-    else
-    {
-      index = 0;
-      newData = true;
+
+    if(checksum == buffer) {
+      newData = true;        
+      return;
     }
   }
 }
+*/
 
 void writeMessage()
 {
-  for (int i = 0; i < MAX_CHARS; ++i)
+  checksum = 0;
+  for (int i = 0; i < MESSAGE_LENGTH-1; ++i)
   {
+    checksum ^= message[i];
     mySerial.write(message[i]);
-    if (message[i] == TERMINATION_CHARACTER) return;
   }
-}
-
-void writeErrorMessage()
-{
-  mySerial.write('#E');
-  mySerial.write(errorMessage);
-  mySerial.write(TERMINATION_CHARACTER);
+  mySerial.write(checksum);
+  checksum = 0;
 }
 
 void setup() {
+  delay(500/CLOCK_DIVIDER);
   mySerial.begin(BAUD_RATE);
 
   pinMode(LIGHT_SENS_AMBIENT_PIN, INPUT);
 
-  mySerial.write('#B');
-  mySerial.write(TERMINATION_CHARACTER);
-
-  //flashSetup();
   ledSetup();
 }
 
+
 void loop() {
 
-  //flashLoop();
   ledLoop();
-
-/* 
-  if(error != NONE) {
-    writeErrorMessage();
-  }
-  */
 
   if (mySerial.available())
   {
-    receiveUART();
+    receiveByte();
   }
 
   if (newData) {
     switch (message[0]) {
-      // GENERAL
-      /* 
-      case '#':
-        writeMessage();
-        break;
-      */
+      case 'C':
+        ledOn = false;
       case 'R':
         id = message[1];
         message[1] = id + 1;
         writeMessage();
         break;
-        /* 
-      case 'P':
-        writeMessage();
-        mySerial.write('#');
-        mySerial.write(id);
-        mySerial.write(TERMINATION_CHARACTER);
-        break;
-      case 'V':
-        mySerial.write('#');
-        mySerial.write(id);
-        mySerial.write(readVccVoltage());
-        mySerial.write(TERMINATION_CHARACTER);
-        break;
-        */
 
-      // LED
       case 'L':
         if (id == message[1]) {
           ledStartTime = millis();
           ledOn = true;
-          ledDuration = 700/CLOCK_DIVIDER;
+
+          ledBrightness = message[2];
+          ledOnDuration = (message[3]*100)/CLOCK_DIVIDER;
+          ledFadeDuration = (message[4]*100)/CLOCK_DIVIDER;
           break;
         }
         writeMessage();
         break;
-      // FLASH
-      /*
-      case 'T':
-        if (id == message[1]) {
-          chargeAndScheduleFlash();
-          break;
-        }
-        writeMessage();
-        break;
-      case 'A':
-        break;
-      case 'C':
-        pinMode(RELAY_TRIGGER_PIN, OUTPUT);
-        digitalWrite(RELAY_TRIGGER_PIN, HIGH);
-        delay(RELAY_SWITCH_TIME);
-        digitalWrite(RELAY_TRIGGER_PIN, LOW);
-        pinMode(LIGHT_SENS_FLASH_PIN, INPUT);
-
-        pinMode(CHRG_TRIGGER_PIN, OUTPUT);
-        analogWrite(CHRG_TRIGGER_PIN, 0);
-
-        flashScheduled = false;
-        relayCloseScheduled = false;
-
-        writeMessage();
-        break;
-      case 'S':
-        chargeTriggerDutyCycle = message[1]+50;
-        if(flashScheduled) {
-          pinMode(CHRG_TRIGGER_PIN, OUTPUT);
-          analogWrite(CHRG_TRIGGER_PIN, chargeTriggerDutyCycle);
-        }
-        writeMessage();
-        break;
-      case 'K':
-        chargeTriggerDutyCycle = 255;
-        if(flashScheduled) {
-          pinMode(CHRG_TRIGGER_PIN, OUTPUT);
-          analogWrite(CHRG_TRIGGER_PIN, chargeTriggerDutyCycle);
-        }
-        writeMessage();
-        break;
-        */
       default:
         break;
     }
