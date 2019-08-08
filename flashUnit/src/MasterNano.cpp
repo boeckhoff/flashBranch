@@ -57,7 +57,7 @@ void chaseLoop() {
                 writeMessage();
                 delay(chaseParams[1]*100);
             }
-        break;
+            break;
         case 'B':
             int i = rand() % NUM_UNITS;
             message[0] = 'L';
@@ -67,10 +67,9 @@ void chaseLoop() {
             message[4] = chaseParams[4];
             writeMessage();
             delay(chaseParams[1]*100);
-
-        break;
+            break;
         default:
-        break;
+            break;
     }
 }
 

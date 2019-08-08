@@ -34,7 +34,11 @@
 
 // TIMING
 #define CLOCK_DIVIDER 8
+
+// BAUD
 #define BAUD_RATE 38400
+#define USE_ECC false
+#define TERMINATION_CHARACTER '\0'
 
 enum ERROR_CODE
 {
@@ -65,8 +69,39 @@ void blink() {
   delay(50/CLOCK_DIVIDER);
 }
 
+char receivePayloadByte() {
+  char b[3];
+
+  for(int i = 0; i < 3; ++i) {
+    while(!Serial.available());
+    b[i] = Serial.read();
+  }
+
+  if(b[0] == b[1]) {
+    return b[0];
+  }
+
+  if(b[1] == b[2]) {
+    return b[1];
+  }
+
+  if(b[2] == b[3]) {
+    return b[2];
+  }
+
+  blink();
+  return '\n';
+}
+
 void receiveByte() {
-  buffer = mySerial.read();
+  blink();
+
+  if(USE_ECC) {
+    buffer = receivePayloadByte();
+  }
+  else {
+    buffer = mySerial.read();
+  }
 
   if(index == MESSAGE_LENGTH-1) {
     if(buffer == checksum) {
@@ -125,6 +160,15 @@ void writeMessage()
   checksum = 0;
 }
 
+uint16_t extractMillis(char input) {
+  if(input <= 10) {
+    return input*10;
+  }
+  else {
+    return (input-10)*100;
+  }
+}
+
 void setup() {
   delay(500/CLOCK_DIVIDER);
   mySerial.begin(BAUD_RATE);
@@ -133,7 +177,6 @@ void setup() {
 
   ledSetup();
 }
-
 
 void loop() {
 
@@ -160,8 +203,8 @@ void loop() {
           ledOn = true;
 
           ledBrightness = message[2];
-          ledOnDuration = (message[3]*100)/CLOCK_DIVIDER;
-          ledFadeDuration = (message[4]*100)/CLOCK_DIVIDER;
+          ledOnDuration = extractMillis(message[3])/CLOCK_DIVIDER;
+          ledFadeDuration = extractMillis(message[4])/CLOCK_DIVIDER;
           break;
         }
         writeMessage();
